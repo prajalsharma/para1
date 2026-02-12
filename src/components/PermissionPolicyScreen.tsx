@@ -20,6 +20,11 @@ import type { BlockedAction } from '../types/permissions';
 import { BASE_CHAIN_ID, SUPPORTED_CHAINS, SUGGESTED_USD_LIMIT } from '../types/permissions';
 import { getBlockedActionDescription } from '../utils/permissionEnforcement';
 import { formatPolicyForDisplay } from '../utils/paraPolicyBuilder';
+import {
+  createChildWalletViaServer,
+  isPaymentRequired,
+  getWalletCreationFee
+} from '../services/walletService';
 
 const ALL_BLOCKED_ACTIONS: BlockedAction[] = [
   'CONTRACT_DEPLOY',
@@ -39,11 +44,16 @@ export function PermissionPolicyScreen() {
     toggleBlockedAction,
     linkChildToPolicy,
   } = usePermissions();
-  const { createWallet } = useParaAuth();
+  const { wallets } = useParaAuth();
 
   const [showPolicyPreview, setShowPolicyPreview] = useState(false);
   const [isCreatingChildWallet, setIsCreatingChildWallet] = useState(false);
   const [childWalletStatus, setChildWalletStatus] = useState<{ type: 'error' | 'info'; message: string } | null>(null);
+  const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
+
+  // Payment info
+  const paymentRequired = isPaymentRequired();
+  const walletFee = getWalletCreationFee();
 
   if (!currentPolicy) {
     return (
@@ -69,36 +79,58 @@ export function PermissionPolicyScreen() {
     toggleBlockedAction(currentPolicy.id, action);
   };
 
+  /**
+   * Handle wallet creation via server-side API
+   * This ensures all sensitive operations happen server-side
+   */
   const handleCreateChildWallet = async () => {
     setIsCreatingChildWallet(true);
     setChildWalletStatus(null);
+    setShowPaymentConfirm(false);
+
+    const parentAddress = wallets[0]?.address || currentPolicy.parentWalletAddress;
+
+    if (!parentAddress) {
+      setChildWalletStatus({
+        type: 'error',
+        message: 'Parent wallet address not found. Please reconnect.',
+      });
+      setIsCreatingChildWallet(false);
+      return;
+    }
 
     try {
-      console.log('[UI] Creating child wallet via Para SDK...');
+      console.log('[UI] Creating child wallet via server API...');
 
-      // Call the real Para SDK to create a new wallet
-      const result = await createWallet('EVM');
+      // Call server endpoint - all sensitive operations happen there
+      const result = await createChildWalletViaServer({
+        parentWalletAddress: parentAddress,
+        restrictToBase: currentPolicy.restrictToBase,
+        maxUsd: currentPolicy.usdLimit,
+        policyName: currentPolicy.name,
+        devMode: !paymentRequired, // Use dev mode if no payment configured
+      });
 
-      if (result && result.address) {
-        console.log('[UI] Para wallet created successfully:', {
-          id: result.id,
-          address: result.address,
-          type: result.type,
+      if (result.success && result.walletAddress) {
+        console.log('[UI] Child wallet created successfully:', {
+          walletAddress: result.walletAddress,
+          walletId: result.walletId,
+          policy: result.policy,
         });
 
-        // Link the REAL wallet address from Para
-        linkChildToPolicy(currentPolicy.id, result.address);
+        // Link the REAL wallet address returned from Para via server
+        linkChildToPolicy(currentPolicy.id, result.walletAddress);
 
         setChildWalletStatus({
           type: 'info',
-          message: 'Child wallet created successfully via Para.',
+          message: 'Child wallet created successfully! The wallet is now linked to your policy.',
         });
       } else {
-        throw new Error('Para returned empty wallet result');
+        throw new Error(result.error || 'Server returned no wallet address');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[UI] Para wallet creation failed:', errorMessage);
+      console.error('[UI] Wallet creation failed:', errorMessage);
 
       setChildWalletStatus({
         type: 'error',
@@ -106,6 +138,18 @@ export function PermissionPolicyScreen() {
       });
     } finally {
       setIsCreatingChildWallet(false);
+    }
+  };
+
+  /**
+   * Show payment confirmation before creating wallet
+   */
+  const handlePayAndCreate = () => {
+    if (paymentRequired) {
+      setShowPaymentConfirm(true);
+    } else {
+      // No payment required - proceed directly
+      handleCreateChildWallet();
     }
   };
 
@@ -316,23 +360,73 @@ export function PermissionPolicyScreen() {
               </div>
             ) : (
               <div className="space-y-4">
-                <button
-                  className="btn-primary w-full sm:w-auto"
-                  onClick={handleCreateChildWallet}
-                  disabled={isCreatingChildWallet}
-                >
-                  {isCreatingChildWallet ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Creating Wallet...
-                    </>
-                  ) : (
-                    'Create Child Wallet'
-                  )}
-                </button>
+                {/* Payment Confirmation Modal */}
+                {showPaymentConfirm && (
+                  <div className="p-4 bg-primary-50 rounded-lg border border-primary-200">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-primary-800">Confirm Wallet Creation</p>
+                        <p className="text-sm text-primary-600 mt-1">
+                          A fee of ${walletFee} will be charged to create the child wallet.
+                        </p>
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            className="btn-primary btn-sm"
+                            onClick={handleCreateChildWallet}
+                            disabled={isCreatingChildWallet}
+                          >
+                            {isCreatingChildWallet ? 'Processing...' : 'Confirm & Pay'}
+                          </button>
+                          <button
+                            className="btn-secondary btn-sm"
+                            onClick={() => setShowPaymentConfirm(false)}
+                            disabled={isCreatingChildWallet}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Main Create Wallet Button */}
+                {!showPaymentConfirm && (
+                  <div className="space-y-3">
+                    <button
+                      className="btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
+                      onClick={handlePayAndCreate}
+                      disabled={isCreatingChildWallet}
+                    >
+                      {isCreatingChildWallet ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Creating Wallet...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {paymentRequired ? `Pay $${walletFee} & Create Wallet` : 'Create Child Wallet'}
+                        </>
+                      )}
+                    </button>
+                    {paymentRequired && (
+                      <p className="text-xs text-slate-500">
+                        Wallet creation fee: ${walletFee}. Securely processed via Stripe.
+                      </p>
+                    )}
+                  </div>
+                )}
                 {childWalletStatus?.type === 'error' && (
                   <p className="text-sm text-danger-600">{childWalletStatus.message}</p>
                 )}

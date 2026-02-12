@@ -1,73 +1,123 @@
-# React + TypeScript + Vite
+# Para Allowance Wallet
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A parent-child crypto allowance wallet built with Para SDK, React, and TypeScript.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Parent Dashboard**: Create policies with customizable permissions
+- **Child View**: View allowance rules and wallet balance
+- **Dynamic Permissions**: Configure chain restrictions and spending limits
+- **Server-Side Wallet Creation**: Secure wallet creation via Para API
 
-## React Compiler
+## Environment Variables
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Required for Vercel/Production
 
-## Expanding the ESLint configuration
+Set these in Vercel Dashboard → Settings → Environment Variables:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `VITE_PARA_API_KEY` | Para client API key (publishable) | `pk_...` |
+| `PARA_SECRET_KEY` | Para server API key (secret) | `sk_...` |
+| `VITE_PARA_ENV` | Environment: `development` or `production` | `development` |
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Optional: Payment Integration (Stripe)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `STRIPE_SECRET_KEY` | Stripe secret key (server-side) | `sk_test_...` |
+| `VITE_STRIPE_KEY` | Stripe publishable key (client-side) | `pk_test_...` |
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+If Stripe keys are not configured, wallet creation uses dev stub mode (still calls real Para API).
+
+## Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Create .env file from example
+cp .env.example .env
+
+# Edit .env with your Para API key
+# Get keys from https://developer.getpara.com
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Deployment to Vercel
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+1. Push to GitHub
+2. Import to Vercel
+3. Set environment variables in Vercel Dashboard:
+   - `VITE_PARA_API_KEY` (required)
+   - `PARA_SECRET_KEY` (required for wallet creation)
+   - `VITE_PARA_ENV` (optional, defaults to `development`)
+4. Deploy
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## API Endpoints
+
+### `POST /api/child/create-wallet`
+
+Creates a child wallet via Para API (server-side).
+
+**Request:**
+```json
+{
+  "parentWalletAddress": "0x...",
+  "restrictToBase": true,
+  "maxUsd": 15,
+  "policyName": "Weekly Allowance",
+  "devMode": true
+}
 ```
+
+**Response:**
+```json
+{
+  "success": true,
+  "walletAddress": "0x...",
+  "walletId": "wallet_...",
+  "policy": {
+    "name": "Weekly Allowance",
+    "allowedChains": ["8453"],
+    "hasUsdLimit": true,
+    "usdLimit": 15,
+    "restrictToBase": true
+  }
+}
+```
+
+### `GET /api/_checks/wallet-flow`
+
+Health check endpoint for CI/CD.
+
+## Para Permissions Model
+
+The app follows Para's Permissions framework:
+
+```
+Policy → Scope → Permission → Condition
+```
+
+- **Policy**: App-specific permissions contract
+- **Scope**: User-facing consent grouping
+- **Permission**: Specific executable action (transfer, sign)
+- **Condition**: Constraints (chain, value limit)
+
+See: https://docs.getpara.com/v2/concepts/permissions
+
+## Tech Stack
+
+- React 19 + TypeScript
+- Vite 7
+- Para React SDK 2.10
+- TailwindCSS
+- Vercel Serverless Functions
