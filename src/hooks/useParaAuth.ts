@@ -119,14 +119,36 @@ export function useParaAuth(): UseParaAuthReturn {
   }, [isLoggedIn, isWalletLoading, account.isLoading, wallet, account.embedded?.email, setupUserProfile, loadChildPolicy]);
 
   const openAuthModal = useCallback(() => {
-    console.log('[Para] openAuthModal called. isModalOpen:', isModalOpen, 'isReady:', paraStatus.isReady);
+    console.log('[Para] openAuthModal called:', {
+      isModalOpen,
+      isReady: paraStatus.isReady,
+      hasClient: !!para,
+      isConnected: account.isConnected,
+    });
+
+    if (!paraStatus.isReady) {
+      console.warn('[Para] SDK not ready yet, waiting...');
+      // Retry after a short delay
+      setTimeout(() => {
+        if (paraStatus.isReady) {
+          try {
+            openModal();
+            console.log('[Para] openModal() executed after delay');
+          } catch (err) {
+            console.error('[Para] Error opening modal after delay:', err);
+          }
+        }
+      }, 500);
+      return;
+    }
+
     try {
       openModal();
-      console.log('[Para] openModal() executed');
+      console.log('[Para] openModal() executed successfully');
     } catch (err) {
       console.error('[Para] Error opening modal:', err);
     }
-  }, [openModal, isModalOpen, paraStatus.isReady]);
+  }, [openModal, isModalOpen, paraStatus.isReady, para, account.isConnected]);
 
   const logout = useCallback(() => {
     hasSetupProfile.current = false;

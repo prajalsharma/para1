@@ -97,9 +97,20 @@ async function bootstrap() {
     const paraEnv = PARA_ENV === 'production' ? Environment.PROD : Environment.BETA;
 
     if (!PARA_API_KEY) {
-      console.warn('[Para] No API key found. Set VITE_PARA_API_KEY');
+      console.error('[Para] CRITICAL: No API key found!');
+      console.error('[Para] Set VITE_PARA_API_KEY in environment variables');
+      console.error('[Para] For Vercel: Add VITE_PARA_API_KEY in Settings → Environment Variables');
+      // Show visible warning
+      const warningDiv = document.createElement('div');
+      warningDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#fef2f2;color:#991b1b;padding:12px;text-align:center;z-index:9999;font-size:14px;';
+      warningDiv.innerHTML = '<strong>Warning:</strong> Para API key not configured. Login will not work. Set VITE_PARA_API_KEY in environment.';
+      document.body.prepend(warningDiv);
     } else {
-      console.log('[Para] API key loaded, env:', PARA_ENV, 'prefix:', PARA_API_KEY.split('_')[0]);
+      console.log('[Para] API key loaded successfully:', {
+        env: PARA_ENV,
+        keyPrefix: PARA_API_KEY.substring(0, 10) + '...',
+        keyLength: PARA_API_KEY.length,
+      });
     }
 
     // Create React Query client
@@ -193,6 +204,20 @@ async function bootstrap() {
 
     // Render the app
     updateLoadingStatus('Rendering application...');
+
+    // Para modal configuration
+    // @see https://docs.getpara.com/v2/react/guides/customization/modal
+    const paraModalConfig = {
+      theme: {
+        mode: 'light' as const,
+        accentColor: '#6366f1', // Primary color
+      },
+      logo: undefined, // Use default Para logo
+      recoverySecretStepEnabled: true,
+      disableEmailLogin: false,
+      disablePhoneLogin: false,
+    };
+
     createRoot(rootElement).render(
       React.createElement(React.StrictMode, null,
         React.createElement(ErrorBoundary, null,
@@ -204,7 +229,8 @@ async function bootstrap() {
               },
               config: {
                 appName: 'Para Allowance Wallet',
-              }
+              },
+              paraModalConfig,
             },
               React.createElement(PermissionProvider, null,
                 React.createElement(App, null)
