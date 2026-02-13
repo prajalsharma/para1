@@ -25,6 +25,7 @@ import {
   isPaymentRequired,
   getWalletCreationFee
 } from '../services/walletService';
+import { TransactionTester } from './TransactionTester';
 
 const ALL_BLOCKED_ACTIONS: BlockedAction[] = [
   'CONTRACT_DEPLOY',
@@ -464,6 +465,17 @@ export function PermissionPolicyScreen() {
             </div>
           )}
         </section>
+
+        {/* Transaction Tester - Verify Para Policy Enforcement */}
+        {currentPolicy.childWalletAddress && (
+          <section className="mb-6">
+            <TransactionTester
+              walletAddress={currentPolicy.childWalletAddress}
+              allowedChains={currentPolicy.allowedChains}
+              usdLimit={currentPolicy.usdLimit}
+            />
+          </section>
+        )}
 
         {/* Footer */}
         <footer className="text-center py-6">

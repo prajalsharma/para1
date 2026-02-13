@@ -103,3 +103,95 @@ export function isPaymentRequired(): boolean {
 export function getWalletCreationFee(): number {
   return 5; // $5 fee for wallet creation
 }
+
+/**
+ * Transaction validation request
+ */
+export interface ValidateTransactionRequest {
+  walletAddress: string;
+  chainId: string;
+  to: string;
+  valueUsd?: number;
+  transactionType: 'transfer' | 'sign' | 'contractCall' | 'deploy';
+}
+
+/**
+ * Transaction validation response
+ */
+export interface ValidateTransactionResponse {
+  success: boolean;
+  allowed?: boolean;
+  error?: string;
+  paraEnforced: boolean;
+  rejectedBy?: 'para_policy';
+  condition?: string;
+  policy?: {
+    name: string;
+    allowedChains: string[];
+  };
+}
+
+/**
+ * Validate a transaction against the wallet's Para policy
+ *
+ * This calls the server endpoint which enforces Para policies.
+ * Para evaluates every request against conditions at runtime.
+ * Any permission that evaluates to False causes the transaction to be rejected.
+ *
+ * @param request - Transaction parameters to validate
+ * @returns Validation result with Para policy enforcement details
+ */
+export async function validateTransactionWithPara(
+  request: ValidateTransactionRequest
+): Promise<ValidateTransactionResponse> {
+  try {
+    console.log('[WalletService] Validating transaction with Para policy:', {
+      walletAddress: request.walletAddress?.substring(0, 10) + '...',
+      chainId: request.chainId,
+      valueUsd: request.valueUsd,
+      type: request.transactionType,
+    });
+
+    const response = await fetch('/api/child/sign-transaction', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('[WalletService] Para policy rejected transaction:', {
+        error: data.error,
+        condition: data.condition,
+        rejectedBy: data.rejectedBy,
+      });
+      return {
+        success: false,
+        allowed: false,
+        error: data.error,
+        paraEnforced: true,
+        rejectedBy: data.rejectedBy,
+        condition: data.condition,
+        policy: data.policy,
+      };
+    }
+
+    console.log('[WalletService] Transaction approved by Para policy:', {
+      allowed: data.allowed,
+      policyName: data.policy?.name,
+    });
+
+    return data;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Network error';
+    console.error('[WalletService] Validation request failed:', message);
+    return {
+      success: false,
+      error: `Failed to validate transaction: ${message}`,
+      paraEnforced: false,
+    };
+  }
+}

@@ -1,34 +1,47 @@
 /**
  * Server-side Child Wallet Creation Endpoint
  *
- * This serverless function handles wallet creation securely on the server.
- * All sensitive operations (Para API calls, payment verification) happen here.
+ * Creates REAL wallets via Para Server SDK.
+ *
+ * TWO-LAYER PERMISSION SYSTEM:
+ * ===========================
+ *
+ * LAYER 1 - Para Application Permissions:
+ *   - Configured in Para Developer Portal
+ *   - Enforced by Para at signing time
+ *   - Application-wide (same for all wallets)
+ *   - Example: Allowed chains, blocked operations
+ *
+ * LAYER 2 - Per-Wallet Policies:
+ *   - Defined by parent selections
+ *   - Stored on our server
+ *   - Enforced by our server before calling Para
+ *   - Per-wallet customization (USD limits per child)
+ *
+ * WHY TWO LAYERS:
+ * ==============
+ * Para's createPregenWallet API doesn't accept policy parameters.
+ * Para permissions are APPLICATION-LEVEL (Developer Portal).
+ * For per-wallet customization, we store and enforce policies ourselves.
  *
  * Flow:
- * 1. Receive request with parent selections (restrictBase, maxUsd)
- * 2. Verify payment (Stripe if configured, dev stub otherwise)
- * 3. Build Para policy from parent selections
- * 4. Call Para API to create wallet
- * 5. Return real wallet address
+ * 1. Parent selects: restrictToBase, maxUsd
+ * 2. Server builds Para Policy JSON
+ * 3. Server calls Para SDK → creates REAL wallet
+ * 4. Server stores per-wallet policy
+ * 5. Return REAL wallet address from Para
  *
- * Policy Structure (Per Para Docs):
+ * At signing time:
+ * - Our server validates against per-wallet policy (Layer 2)
+ * - Para validates against app permissions (Layer 1)
+ * - Both must pass for transaction to succeed
+ *
  * @see https://docs.getpara.com/v2/concepts/permissions
- *
- * Policy → Scope → Permission → Condition
- *
- * Example policy JSON for chain + USD restrictions:
- * {
- *   "version": "1.0",
- *   "name": "Child Allowance Policy",
- *   "globalConditions": [
- *     { "type": "chain", "operator": "in", "value": ["8453"] },
- *     { "type": "value", "operator": "lessThanOrEqual", "value": 15 }
- *   ],
- *   "scopes": [...]
- * }
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Para, Environment } from '@getpara/server-sdk';
+import { storeWalletPolicy } from '../lib/policyStorage';
 
 // Chain IDs
 const BASE_CHAIN_ID = '8453';
@@ -187,17 +200,12 @@ async function verifyPayment(paymentToken?: string, devMode?: boolean): Promise<
 }
 
 /**
- * Create wallet via Para API
+ * Create wallet via Para Server SDK
  *
- * @see https://docs.getpara.com/llms.txt
+ * Uses Para's Server SDK to create a pregenerated wallet.
+ * The wallet is created with a unique identifier tied to the parent.
  *
- * Uses Para's REST API:
- * POST /v1/wallets
- * {
- *   "type": "EVM",
- *   "userIdentifier": "string",
- *   "userIdentifierType": "EMAIL|CUSTOM_ID"
- * }
+ * @see https://docs.getpara.com/llms-full.txt
  */
 async function createWalletViaPara(
   parentAddress: string,
@@ -213,61 +221,62 @@ async function createWalletViaPara(
     };
   }
 
-  const baseUrl = paraEnv === 'production'
-    ? 'https://api.getpara.com'
-    : 'https://api.beta.getpara.com';
-
   try {
     // Generate unique identifier for child wallet
-    const childIdentifier = `child_${parentAddress.toLowerCase()}_${Date.now()}`;
+    const timestamp = Date.now();
+    const childIdentifier = `child_${parentAddress.toLowerCase()}_${timestamp}`;
 
-    console.log('[Server] Creating wallet via Para API:', {
+    console.log('[Server] Creating wallet via Para Server SDK:', {
       env: paraEnv,
       parentAddress: parentAddress.substring(0, 10) + '...',
-      childIdentifier: childIdentifier.substring(0, 20) + '...',
+      childIdentifier: childIdentifier.substring(0, 30) + '...',
       policyName: policy.name,
+      hasChainRestriction: policy.globalConditions.some(c => c.type === 'chain'),
+      hasUsdLimit: policy.globalConditions.some(c => c.type === 'value'),
     });
 
-    // Call Para API to create wallet
-    const response = await fetch(`${baseUrl}/v1/wallets`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': paraApiKey,
-      },
-      body: JSON.stringify({
-        type: 'EVM',
-        userIdentifier: childIdentifier,
-        userIdentifierType: 'CUSTOM_ID',
-      }),
+    // Initialize Para Server SDK
+    const env = paraEnv === 'production' ? Environment.PROD : Environment.BETA;
+    const para = new Para(env, paraApiKey);
+    await para.ready();
+
+    console.log('[Server] Para SDK initialized');
+
+    // Create pregenerated wallet with custom ID
+    // This creates a wallet that can be claimed by the child user
+    const wallet = await para.createPregenWallet({
+      type: 'EVM',
+      pregenId: { customId: childIdentifier },
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Server] Para API error:', response.status, errorText);
-      throw new Error(`Para API error: ${response.status}`);
+    console.log('[Server] Para wallet created:', {
+      walletId: wallet.id,
+      address: wallet.address,
+      type: wallet.type,
+    });
+
+    if (!wallet.address) {
+      throw new Error('Para SDK returned no wallet address');
     }
 
-    const result = await response.json();
+    // Store the policy for this wallet (for transaction validation)
+    await storeWalletPolicy(wallet.address, parentAddress, policy);
 
-    console.log('[Server] Para API response:', {
-      walletId: result.id,
-      address: result.address,
-      type: result.type,
+    console.log('[Server] Policy stored for wallet:', {
+      walletAddress: wallet.address.substring(0, 10) + '...',
+      parentAddress: parentAddress.substring(0, 10) + '...',
+      policyName: policy.name,
+      conditionCount: policy.globalConditions.length,
     });
-
-    if (!result.address) {
-      throw new Error('Para API returned no wallet address');
-    }
 
     return {
       success: true,
-      walletAddress: result.address,
-      walletId: result.id,
+      walletAddress: wallet.address,
+      walletId: wallet.id,
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Wallet creation failed';
-    console.error('[Server] Wallet creation error:', msg);
+    console.error('[Server] Wallet creation error:', msg, error);
     return { success: false, error: msg };
   }
 }

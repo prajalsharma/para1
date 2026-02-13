@@ -19,6 +19,7 @@ import { usePermissions } from '../contexts/PermissionContext';
 import { useParaAuth } from '../hooks/useParaAuth';
 import { getBlockedActionDescription } from '../utils/permissionEnforcement';
 import { BASE_CHAIN_ID, SUPPORTED_CHAINS } from '../types/permissions';
+import { TransactionTester } from './TransactionTester';
 
 export function ChildView() {
   const { currentPolicy } = usePermissions();
@@ -204,6 +205,17 @@ export function ChildView() {
             </p>
           </div>
         </section>
+
+        {/* Transaction Tester - Demonstrates Para Policy Enforcement */}
+        {currentPolicy.childWalletAddress && (
+          <section className="mb-6">
+            <TransactionTester
+              walletAddress={currentPolicy.childWalletAddress}
+              allowedChains={currentPolicy.allowedChains}
+              usdLimit={currentPolicy.usdLimit}
+            />
+          </section>
+        )}
 
         {/* Footer */}
         <footer className="text-center py-6">
