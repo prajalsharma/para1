@@ -1,8 +1,20 @@
 /**
  * Transaction Tester Component
  *
- * Allows testing Para policy enforcement by simulating transactions.
- * This component demonstrates that Para enforces policies SERVER-SIDE.
+ * TODO: TEMPORARY CLIENT-SIDE ENFORCEMENT
+ * ========================================
+ * This component implements client-side policy enforcement as a TEMPORARY
+ * measure while Para backend issues are being resolved.
+ *
+ * Current behavior:
+ * - Validates transactions BEFORE allowing submit
+ * - Disables button when transaction would be blocked
+ * - Shows clear error messages to user
+ *
+ * Once Para backend is working:
+ * - Keep prediction UI for good UX
+ * - Para will be the true enforcement layer
+ * - Client-side checks become UX-only
  *
  * Tests:
  * 1. Chain restriction - Attempt transactions on allowed/blocked chains
@@ -171,11 +183,11 @@ export function TransactionTester({ walletAddress, allowedChains, usdLimit }: Tr
           </p>
         </div>
 
-        {/* Test Button */}
+        {/* Test Button - TODO: TEMPORARY - disabled when blocked for client-side enforcement */}
         <button
           onClick={handleTest}
-          disabled={isLoading}
-          className="btn-primary w-full"
+          disabled={isLoading || prediction === 'BLOCKED'}
+          className={`w-full ${prediction === 'BLOCKED' ? 'btn-disabled bg-slate-300 text-slate-500 cursor-not-allowed' : 'btn-primary'}`}
         >
           {isLoading ? (
             <>
@@ -185,6 +197,8 @@ export function TransactionTester({ walletAddress, allowedChains, usdLimit }: Tr
               </svg>
               Validating with Para...
             </>
+          ) : prediction === 'BLOCKED' ? (
+            'Transaction Blocked'
           ) : (
             'Test Transaction'
           )}
@@ -247,11 +261,14 @@ export function TransactionTester({ walletAddress, allowedChains, usdLimit }: Tr
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div className="text-sm text-slate-600">
-            <p className="font-medium text-slate-700 mb-1">How Para Enforces Policies</p>
+            <p className="font-medium text-slate-700 mb-1">How Policy Enforcement Works</p>
             <p>
-              Para evaluates every request against conditions at runtime.
-              Any permission that evaluates to False causes the transaction to be rejected.
-              This happens <strong>server-side</strong> - client-side checks are only for UX.
+              Transactions are validated against your parent's policy before being sent.
+              Invalid transactions are blocked to protect you from mistakes.
+            </p>
+            {/* TODO: TEMPORARY - Update this message once Para backend is working */}
+            <p className="mt-2 text-xs text-slate-500">
+              Note: Client-side enforcement is active. In production, Para enforces policies server-side.
             </p>
           </div>
         </div>

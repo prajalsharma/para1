@@ -3,6 +3,14 @@
  *
  * CRITICAL SERVER-SIDE ENFORCEMENT COMPONENT
  *
+ * TODO: TEMPORARY - Server-side policy storage and validation
+ * ===========================================================
+ * This module implements server-side enforcement as a TEMPORARY measure
+ * while Para backend issues are being resolved. Once Para is working:
+ * - Para will enforce policies at signing time via their SDK
+ * - This module will store policies for UX display only
+ * - validateTransaction will be replaced by Para's actual response
+ *
  * This module stores per-wallet policies and validates transactions against them.
  * Since Para's SDK doesn't support per-wallet policy attachment, we implement
  * server-side enforcement ourselves:
@@ -191,6 +199,14 @@ export async function getWalletPolicy(
 
 /**
  * Simulate Para's policy enforcement (for dev/testing only)
+ *
+ * TODO: TEMPORARY - This function simulates Para's enforcement
+ * ============================================================
+ * This is a TEMPORARY implementation while Para backend issues are resolved.
+ * Once Para is working:
+ * - Remove this function
+ * - Use Para's actual signTransaction response
+ * - Para will reject transactions that violate policy
  *
  * NOTE: In production, Para enforces policies at signing time.
  * This function simulates what Para would do, for testing when

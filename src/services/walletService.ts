@@ -134,6 +134,12 @@ export interface ValidateTransactionResponse {
 /**
  * Validate a transaction against the wallet's Para policy
  *
+ * TODO: TEMPORARY - This server call simulates Para enforcement while
+ * Para backend issues are being resolved. Once Para is working:
+ * - This will call Para's actual signing API
+ * - Para will enforce policies at signing time
+ * - Server will return Para's actual response
+ *
  * This calls the server endpoint which enforces Para policies.
  * Para evaluates every request against conditions at runtime.
  * Any permission that evaluates to False causes the transaction to be rejected.

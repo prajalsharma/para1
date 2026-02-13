@@ -1,6 +1,20 @@
 /**
  * Permission Enforcement Utilities
  *
+ * TODO: TEMPORARY CLIENT-SIDE ENFORCEMENT
+ * ========================================
+ * This client-side enforcement is a TEMPORARY measure while Para backend
+ * validation issues are being resolved (JSON.parse error at line 1 column 1).
+ *
+ * In production, Para enforces permissions SERVER-SIDE at signing time.
+ * Client-side checks are for UX only - they cannot be bypassed because
+ * the server (Para) will reject invalid transactions regardless.
+ *
+ * Once Para backend is working:
+ * - Remove reliance on client-side enforcement
+ * - Keep client-side checks ONLY for UX (showing errors before submit)
+ * - Para will be the true enforcement layer
+ *
  * This module provides utilities for enforcing permission policies
  * on transactions before they are signed and submitted.
  *
@@ -44,6 +58,10 @@ export interface TransactionRequest {
 
 /**
  * Validates a transaction against a permission policy
+ *
+ * TODO: TEMPORARY - This is the main client-side enforcement function.
+ * Call this BEFORE any transaction attempt to block invalid actions in the UI.
+ * Once Para backend is working, this becomes UX-only (Para is the true enforcer).
  *
  * This function should be called BEFORE attempting to sign any transaction
  * for a child wallet. It enforces the parent-defined permission rules.
