@@ -29,8 +29,20 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Para, Environment } from '@getpara/server-sdk';
 import { getWalletPolicy } from '../lib/policyStorage';
+
+// Lazy import Para SDK to handle import failures gracefully
+let ParaModule: { Para: any; Environment: any } | null = null;
+async function getParaSDK(): Promise<{ Para: any; Environment: any } | null> {
+  if (ParaModule) return ParaModule;
+  try {
+    ParaModule = await import('@getpara/server-sdk');
+    return ParaModule;
+  } catch (error) {
+    console.error('[Server] Failed to load Para SDK:', error);
+    return null;
+  }
+}
 
 // Chain IDs for display
 const CHAIN_NAMES: Record<string, string> = {
@@ -211,6 +223,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Para will enforce permissions and either sign or reject
     console.log('[Server] Calling Para signing API...');
 
+    const sdk = await getParaSDK();
+    if (!sdk) {
+      return res.status(500).json({
+        success: false,
+        error: 'Para SDK failed to load. Check server logs.',
+      });
+    }
+
+    const { Para, Environment } = sdk;
     const env = paraEnv === 'production' ? Environment.PROD : Environment.BETA;
     const para = new Para(env, paraSecretKey);
     await para.ready();
