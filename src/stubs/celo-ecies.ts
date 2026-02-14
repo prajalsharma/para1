@@ -1,15 +1,29 @@
 /**
  * Stub for @celo/utils/lib/ecies
- * This module is not available in browser environments
- * and is only used by Para SDK's optional Celo connector
+ *
+ * TODO: BROWSER COMPATIBILITY FIX
+ * This module is not available in browser environments.
+ * It's only used by Para SDK's optional Celo connector which we don't use.
+ *
+ * These stubs return undefined/null silently instead of throwing errors
+ * to prevent runtime crashes when the Para SDK checks for Celo support.
  */
 
-export function Encrypt(): never {
-  throw new Error('@celo/utils/lib/ecies is not available in browser');
+// Silent no-op stubs - do not throw errors
+export function Encrypt(): null {
+  // Silent no-op - Celo connector not used in this app
+  return null;
 }
 
-export function Decrypt(): never {
-  throw new Error('@celo/utils/lib/ecies is not available in browser');
+export function Decrypt(): null {
+  // Silent no-op - Celo connector not used in this app
+  return null;
 }
 
-export default { Encrypt, Decrypt };
+// Additional exports that @celo/utils/lib/ecies might have
+export const ECIES = {
+  Encrypt,
+  Decrypt,
+};
+
+export default { Encrypt, Decrypt, ECIES };

@@ -151,6 +151,43 @@ npm run debug
 - Requires Node.js 20+: `nvm install 20 && nvm use 20`
 - Clear cache: `rm -rf node_modules package-lock.json && npm install`
 
+## Server/Client Import Rules
+
+### CRITICAL: Node-Only Modules
+
+The Para SDK includes optional connectors for Cosmos, Solana, and Celo which depend on Node-only modules. These **cannot** be imported in client-side code.
+
+**Forbidden in client code:**
+- `@celo/utils` - Celo blockchain utilities (Node only)
+- `@cosmjs/encoding` - Cosmos SDK encoding (Node only)
+- Any `crypto` modules without browser polyfills
+
+**How it's handled:**
+1. `vite.config.ts` has a `stubMissingDeps` plugin that intercepts these imports
+2. `src/stubs/` contains silent no-op stubs for forbidden modules
+3. `npm run check-bundle` verifies no forbidden modules leaked into the bundle
+
+**Adding new stubs:**
+1. Create a stub file in `src/stubs/` that exports silent no-ops (NOT throwing errors)
+2. Add the alias to `vite.config.ts` → `resolve.alias`
+3. Run `npm run build:verify` to confirm
+
+### CI Bundle Checks
+
+```bash
+# Build and verify no forbidden modules in bundle
+npm run build:verify
+
+# Or separately:
+npm run build
+npm run check-bundle
+```
+
+The check script will fail CI if any of these patterns appear in the built bundle:
+- `@celo/utils/lib/ecies is not available in browser`
+- `@celo/utils is not available in browser`
+- `@cosmjs/encoding is not available`
+
 ## Tech Stack
 
 - React 19 + TypeScript

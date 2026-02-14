@@ -46,13 +46,16 @@ function stubMissingDeps(): Plugin {
     },
     load(id) {
       if (id.startsWith('\0stub:')) {
-        // Return empty exports for stubbed modules
+        // TODO: BROWSER COMPATIBILITY - Return silent no-op stubs instead of throwing
+        // This prevents runtime crashes when Para SDK checks for optional connectors
         return `
           export default {};
-          export const Encrypt = () => { throw new Error('Module not available'); };
-          export const Decrypt = () => { throw new Error('Module not available'); };
-          export const toBech32 = () => { throw new Error('Module not available'); };
-          export const fromBech32 = () => { throw new Error('Module not available'); };
+          export const Encrypt = () => null;
+          export const Decrypt = () => null;
+          export const toBech32 = () => null;
+          export const fromBech32 = () => null;
+          export const ecies = { Encrypt: () => null, Decrypt: () => null };
+          export const ECIES = { Encrypt: () => null, Decrypt: () => null };
         `
       }
       return null

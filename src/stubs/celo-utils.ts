@@ -1,15 +1,27 @@
 /**
  * Stub for @celo/utils
- * This module is not available in browser environments
- * and is only used by Para SDK's optional Celo connector
+ *
+ * TODO: BROWSER COMPATIBILITY FIX
+ * This module is not available in browser environments.
+ * It's only used by Para SDK's optional Celo connector which we don't use.
+ *
+ * These stubs return undefined/null silently instead of throwing errors
+ * to prevent runtime crashes when the Para SDK checks for Celo support.
  */
 
-export function Encrypt(): never {
-  throw new Error('@celo/utils is not available in browser');
+// Silent no-op stubs - do not throw errors
+export function Encrypt(): null {
+  return null;
 }
 
-export function Decrypt(): never {
-  throw new Error('@celo/utils is not available in browser');
+export function Decrypt(): null {
+  return null;
 }
 
-export default {};
+// Common @celo/utils exports as silent stubs
+export const ecies = {
+  Encrypt,
+  Decrypt,
+};
+
+export default { Encrypt, Decrypt, ecies };
