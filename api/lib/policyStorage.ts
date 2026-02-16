@@ -32,7 +32,7 @@
  * @see https://docs.getpara.com/v2/concepts/permissions
  */
 
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 
 // Policy condition types matching Para's structure
 interface PolicyCondition {
