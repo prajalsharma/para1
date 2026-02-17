@@ -139,6 +139,22 @@ const paraModalConfig = {
   disablePhoneLogin: false,
 };
 
+// Para event callbacks for debugging auth issues
+const paraCallbacks = {
+  onLogin: (event: unknown) => {
+    console.log('[Para] Login event:', event);
+  },
+  onAccountCreation: (event: unknown) => {
+    console.log('[Para] Account creation event:', event);
+  },
+  onAccountSetup: (event: unknown) => {
+    console.log('[Para] Account setup event:', event);
+  },
+  onLogout: (event: unknown) => {
+    console.log('[Para] Logout event:', event);
+  },
+};
+
 // Render the app
 createRoot(rootElement).render(
   <React.StrictMode>
@@ -153,6 +169,7 @@ createRoot(rootElement).render(
             appName: 'Para Allowance Wallet',
           }}
           paraModalConfig={paraModalConfig}
+          callbacks={paraCallbacks}
         >
           <PermissionProvider>
             <App />
