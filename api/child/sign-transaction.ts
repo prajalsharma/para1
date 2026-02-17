@@ -31,12 +31,20 @@ interface SignTransactionRequest {
   transactionType: 'transfer' | 'sign' | 'contractCall' | 'deploy';
 }
 
-// Import policyStorage directly - it's a server-only module
-import * as policyStorage from '../lib/policyStorage';
+// In-memory policy storage (for demo/beta - replace with DB in production)
+const inMemoryPolicies = new Map<string, { policy: { globalConditions?: Array<{ type: string; operator: string; value: unknown }>; allowedChains?: string[]; name: string }; parentAddress: string }>();
 
-// Wrapper to match existing code structure
+// Wrapper for policy storage
 async function getPolicyStorage() {
-  return policyStorage;
+  return {
+    getWalletPolicy: async (walletAddress: string) => {
+      const record = inMemoryPolicies.get(walletAddress.toLowerCase());
+      if (record) {
+        return { walletAddress: walletAddress.toLowerCase(), ...record };
+      }
+      return undefined;
+    }
+  };
 }
 
 // Lazy import Para SDK to handle import failures gracefully
