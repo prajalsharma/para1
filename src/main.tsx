@@ -134,24 +134,36 @@ const paraModalConfig = {
     accentColor: '#6366f1',
   },
   logo: undefined,
-  recoverySecretStepEnabled: true,
+  // Disable recovery secret step to simplify initial signup flow
+  // This can cause hangs if enabled during account creation
+  recoverySecretStepEnabled: false,
   disableEmailLogin: false,
   disablePhoneLogin: false,
+  // Debug: track modal steps
+  onModalStepChange: (step: string) => {
+    console.log('[Para Modal] Step changed to:', step);
+  },
+  onClose: () => {
+    console.log('[Para Modal] Modal closed');
+  },
 };
 
 // Para event callbacks for debugging auth issues
 const paraCallbacks = {
   onLogin: (event: unknown) => {
-    console.log('[Para] Login event:', event);
+    console.log('[Para] Login SUCCESS:', event);
   },
   onAccountCreation: (event: unknown) => {
-    console.log('[Para] Account creation event:', event);
+    console.log('[Para] Account creation SUCCESS:', event);
   },
   onAccountSetup: (event: unknown) => {
-    console.log('[Para] Account setup event:', event);
+    console.log('[Para] Account setup SUCCESS:', event);
   },
   onLogout: (event: unknown) => {
     console.log('[Para] Logout event:', event);
+  },
+  onError: (error: unknown) => {
+    console.error('[Para] ERROR:', error);
   },
 };
 
